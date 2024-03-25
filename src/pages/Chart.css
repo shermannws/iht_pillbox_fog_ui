@@ -1,0 +1,19 @@
+#chart {
+  height: 100%;
+  width: 75rem;
+  background-color: antiquewhite;
+}
+
+.back-btn {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 10%;
+  font-size: large;
+}
+
+.chart-container {
+  div {
+    display: flexbox;
+  }
+}
