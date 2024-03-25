@@ -3,10 +3,10 @@
 Done by: Sherman Ng Wei Sheng
 
 ## Requirements
-<u>Tested on the following hardware</u>
-Device: Windows 10, 64 bit
-Node.JS Version: 18.4.0
-npm Version: 8.12.1
+<u>Tested on the following hardware / software</u>: <br/>
+Device: Windows 10, 64 bit<br/>
+Node.JS Version: 18.4.0<br/>
+npm Version: 8.12.1<br/>
 
 ## Description
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
