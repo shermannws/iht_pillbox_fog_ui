@@ -15,7 +15,6 @@ import { getPrediction } from "../services/prediction";
 const mqttTopicPillsStatus = "pills/status";
 const mqtt = new MQTT();
 mqtt.connect();
-// to remove
 mqtt.subscribe("pills/status");
 
 function OverviewPage() {
@@ -44,8 +43,11 @@ function OverviewPage() {
       if (beforeState === 1) {
         try {
           // Call getPrediction asynchronously
-          const res = await getPrediction("before", beforeTime.toLocaleString());
+          const res = await getPrediction("before", beforeTime.toISOString());
           const time = res["predicted_time_difference"];
+          if (time[0] == "-") {
+            return
+          }
   
           // Calculate timer based on the prediction result
           const hours = Number(time.split(":")[0]);
