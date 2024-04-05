@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react";
+import {useState, useEffect, useRef} from "react";
 import './OverviewPage.css';
 import MQTT from '../messenger/main'
 import PillNil from '../resources/pill_statuses/nil.svg';
@@ -9,16 +9,16 @@ import PillsListConfigure from "../components/PillsListConfigure";
 import {getLatestMedicationNumber, getPillEntries, createPillEntry, updatePillEntry} from "../services/pillStatus";
 import {getAllActivePills, getPrescription} from "../services/pillList";
 import AlarmIcon from '@mui/icons-material/Alarm';
+import WarningIcon from '@mui/icons-material/Warning';
+import { getPrediction } from "../services/prediction";
 
 const mqttTopicPillsStatus = "pills/status";
 const mqtt = new MQTT();
 mqtt.connect();
 // to remove
 mqtt.subscribe("pills/status");
-mqtt.subscribe("test");
 
 function OverviewPage() {
-  const [input, setInput] = useState("");
   const [beforeState, setBeforeState] = useState(0); //0 for nil, 1 for no, 2 for yes
   const [afterState, setAfterState] = useState(0); //0 for nil, 1 for no, 2 for yes
   const [beforeTime, setBeforeTime] = useState(null);
@@ -28,62 +28,132 @@ function OverviewPage() {
   const [beforePills, setBeforePills] = useState({});
   const [afterPills, setAfterPills] = useState({});
 
+  const [beforeWarning, setBeforeWarning] = useState(false);
+  const [afterWarning, setAfterWarning] = useState(false);
+
   const defaultPatientId = 1;
   let medicationId;
   let beforeMedicationId = 0;
   let afterMedicationId = 0;
 
   useEffect(() => {
-    getAllActivePills().then((res) => {
-      const temp = {}
-      res.forEach((e) => {
-        temp[String(e.name)] = e.weight
-      })
-      setPills(temp);
-    })
-  }, [])
-
-  useEffect(() => {
-    getLatestMedicationNumber(defaultPatientId).then(res => {
-      medicationId = res + 1;
-      console.log(medicationId);
-    })
-  }, [])
-
-  useEffect(() => {
-    getPrescription(defaultPatientId).then((res) => {
-      const before = {}
-      const after = {}
-      res.forEach((e) => {
-        if (e.medication_type == 'before') {
-          before[e.name] = e.assigned
-        } else {
-          after[e.name] = e.assigned
-        }
-      })
-      
-      for (const k of Object.keys(pills)) {
-        if (!(k in before)) {
-          before[k] = false
-        }
-        if (!(k in after)) {
-          after[k] = false
+    let timeoutId;
+  
+    // Define an async function inside the useEffect hook
+    const fetchData = async () => {
+      if (beforeState === 1) {
+        try {
+          // Call getPrediction asynchronously
+          const res = await getPrediction("before", beforeTime.toLocaleString());
+          const time = res["predicted_time_difference"];
+  
+          // Calculate timer based on the prediction result
+          const hours = Number(time.split(":")[0]);
+          const minutes = Number(time.split(":")[1]);
+          const seconds = Number(time.split(":")[2]);
+          const timer = (seconds + minutes * 60 + hours * 60 * 60) * 1000;
+  
+          // Set a timeout to alert patient after the specified duration
+          timeoutId = setTimeout(() => {
+            alertPatient(defaultPatientId, "before");
+          }, timer);
+        } catch (error) {
+          console.error("Error fetching prediction:", error);
         }
       }
-      setBeforePills(before);
-      setAfterPills(after);
+    };
+
+    fetchData();
+  
+    // Cleanup function to clear the timeout when component unmounts or beforeState changes
+    return () => clearTimeout(timeoutId);
+  
+  }, [beforeState]);
+
+  useEffect(() => {
+    let timeoutId;
+  
+    const fetchData = async () => {
+      if (afterState === 1) {
+        try {
+          // Call getPrediction asynchronously
+          const res = await getPrediction("after", beforeTime.toLocaleString());
+          const time = res["predicted_time_difference"];
+  
+          // Calculate timer based on the prediction result
+          const hours = Number(time.split(":")[0]);
+          const minutes = Number(time.split(":")[1]);
+          const seconds = Number(time.split(":")[2]);
+          const timer = (seconds + minutes * 60 + hours * 60 * 60) * 1000;
+  
+          // Set a timeout to alert patient after the specified duration
+          timeoutId = setTimeout(() => {
+            alertPatient(defaultPatientId, "after");
+          }, timer);
+        } catch (error) {
+          console.error("Error fetching prediction:", error);
+        }
+      }
+    };
+  
+    fetchData();
+  
+    // Cleanup function to clear the timeout when component unmounts or beforeState changes
+    return () => clearTimeout(timeoutId);
+  
+  }, [afterState]);
+
+  const fetchData = () => {
+    getAllActivePills().then((res) => {
+      const temp = {}
+      for (let e of res) {
+        temp[String(e.name)] = e.weight
+      }
+      setPills(temp);
+      return temp
+    }).then((pills) => {
+      getPrescription(defaultPatientId).then((res) => {
+        const before = {}
+        const after = {}
+        for (const e in res) {
+          if (e.medication_type == 'before') {
+            before[e.name] = e.assigned
+          } else if (e.medication_type == 'after') {
+            after[e.name] = e.assigned
+          }
+        }
+        
+        for (const k of Object.keys(pills)) {
+          if (!(k in before)) {
+            before[k] = false
+          }
+          if (!(k in after)) {
+            after[k] = false
+          }
+        }
+        setBeforePills(before);
+        setAfterPills(after);
+      })
     })
-  }, [pills])
+    getLatestMedicationNumber(defaultPatientId).then(res => {
+      medicationId = res + 1;
+    })
+    
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
 
   mqtt.client.on('message', (topic, uint8array) => {
     if (topic !== "pills/status") {
       return
     }
+
     let message = JSON.parse(new TextDecoder().decode(uint8array));
     const patientId = message["patient_id"]
     const action = message["action"]
     const weight = message["weight"]
-    console.log(message)
     if (action === "before_new") {
       handleNewPill(patientId, "before", weight)
     } else if (action === "before_take") {
@@ -95,10 +165,29 @@ function OverviewPage() {
     }
   });
 
+  const calculateWeight = (dict, pillWeightDict) => {
+    let res = 0;
+    for (let pill in dict) {
+      if (dict[pill]) {
+        res += pillWeightDict[pill];
+      }
+    }
+    return res;
+  };
+
   const handleNewPill = (patientId, type, weight) => {
-    // handle pill weight verification
+    while (patientId == undefined && medicationId == undefined) {
+      continue
+    }
     if (type === "before") {
-      let administeredTime = new Date()
+      const expectedWeight = calculateWeight(beforePills, pills);
+      const trueWeight = weight * 1000;
+      if (trueWeight > 0.5*expectedWeight && trueWeight < 1.5*expectedWeight) {
+        setBeforeWarning(false);
+      } else {
+        setBeforeWarning(true);
+      }
+      let administeredTime = new Date();
       createPillEntry(patientId, medicationId, "before", administeredTime).then(() => {
         beforeMedicationId = medicationId;
         medicationId++;
@@ -106,7 +195,12 @@ function OverviewPage() {
         setBeforeTime(administeredTime);
       })
     } else {
-      let administeredTime = new Date()
+      const expectedWeight = calculateWeight(afterPills, pills);
+      const trueWeight = weight * 1000;
+      if (trueWeight < 0.8*expectedWeight || trueWeight > 1.2*expectedWeight) {
+        setAfterWarning(true);
+      }
+      let administeredTime = new Date();
       createPillEntry(patientId, medicationId, "after", administeredTime).then(() => {
         afterMedicationId = medicationId;
         medicationId++;
@@ -117,15 +211,17 @@ function OverviewPage() {
   }
 
   const handleTakePill = (patientId, type) => {
-    if (type === "before") {
+    if (type === "before" && beforeMedicationId !== undefined) {
       let consumedTime = new Date();
       updatePillEntry(patientId, beforeMedicationId, consumedTime).then(() => {
+        setBeforeWarning(false);
         setBeforeState(2);
         setBeforeTime(consumedTime);
       })
-    } else {
+    } else if (type === "after" && afterMedicationId !== undefined) {
       let consumedTime = new Date();
       updatePillEntry(patientId, afterMedicationId, consumedTime).then(() => {
+        setAfterWarning(false);
         setAfterState(2);
         setAfterTime(consumedTime);
       })
@@ -168,10 +264,14 @@ function OverviewPage() {
       return;
     }
     resetPillStates();
+    setBeforeWarning(false);
+    setAfterWarning(false);
   }
 
   const handleCfmReset = () => {
     resetPillStates();
+    setBeforeWarning(false);
+    setAfterWarning(false);
     hideResetModal();
   }
 
@@ -187,6 +287,13 @@ function OverviewPage() {
   }
 
   const alertPatient = (patientId, type) => {
+    console.log("sending alert")
+    if (type=="before" && beforeState !== 1) {
+      return
+    }
+    if (type=="after" && afterState !== 1) {
+      return
+    }
     mqtt.publish("reminder/led", JSON.stringify({patientId, type}))
   }
 
@@ -245,10 +352,6 @@ function OverviewPage() {
     </div>
     <h2>Overview Pills Status in Ward 27B</h2>
       <div className="grid-container">
-        {/* <div>
-          <br />
-          <button onClick={()=>mqtt.publish("reminder/led", JSON.stringify({"patientId": 1, "type":"before"}))}>Get Entries</button>
-        </div> */}
         <button onClick={showConfigureModal}>Configure Pills List</button>
         <div></div>
         <div className="grid-item">
@@ -259,13 +362,23 @@ function OverviewPage() {
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
               <img src={stateToPillMap[beforeState]} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(1,"before")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {beforeWarning ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(1,"before")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> {beforeTime?beforeTime.toLocaleTimeString():"-"}</p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
               <img src={stateToPillMap[afterState]} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(1,"after")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {afterWarning ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(1,"after")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> {afterTime?afterTime.toLocaleTimeString():"-"}</p>
             </div>
           </div>
@@ -278,13 +391,23 @@ function OverviewPage() {
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(2,"before")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {false ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(2,"before")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> 11:00:00 AM</p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
               <img src={PillNo} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(2,"after")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {false ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(2,"after")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> 10:55:00 AM</p>
             </div>
           </div>
@@ -297,13 +420,23 @@ function OverviewPage() {
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(3,"before")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {false ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(3,"before")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> 12:00:00 PM</p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(3,"after")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {false ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(3,"after")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> 12:58:00 PM</p>
             </div>
           </div>
@@ -316,13 +449,23 @@ function OverviewPage() {
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
               <img src={PillNil} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(4,"before")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {false ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(4,"before")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> - </p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <button onClick={()=>alertPatient(4,"after")}><AlarmIcon/></button>
+              <div className="pill-panel">
+                <div className="warning-icon">
+                  {false ? <WarningIcon  /> : <></>}
+                </div>
+                <button className="alarm-btn" onClick={()=>alertPatient(4,"after")}><AlarmIcon/></button>
+              </div>
               <p className="pill-status-text">Last Updated: <br/> 13:11:00 PM</p>
             </div>
           </div>

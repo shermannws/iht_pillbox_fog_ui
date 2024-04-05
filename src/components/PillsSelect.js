@@ -34,7 +34,6 @@ export default function PillsSelect(props) {
           })} 
         </FormGroup>
       </FormControl>
-      <p>{JSON.stringify(state)}</p>
     </Box>
   );
 }

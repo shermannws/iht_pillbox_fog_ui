@@ -20,6 +20,16 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 6. `src/services`: Contains the services to interact with local backend server
 
 ## How to Run
+1. Create/Clone the .env.local file from .env.local.example. The following environment variables are required.
+```
+REACT_APP_MQTT_USER=\<USERNAME OF MQTT USER>
+REACT_APP_MQTT_PASSWORD=\<PASSWORD OF MQTT USER>
+REACT_APP_HOST=\<IP ADDR OF MQTT BROKER>
+REACT_APP_PORT=\<PORT OF MQTT BROKER>
+
+REACT_APP_BACKEND_URL=\<URL TO FOG BACKEND EXPRESS SERVER>
+REACT_APP_CLOUD_URL=\<URL TO CLOUD BACKEND SERVER>
+```
 1. Install all dependencies
 ```bash
 npm install

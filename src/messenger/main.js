@@ -1,11 +1,11 @@
 
 // Program Constants
 const mqttClientId = "fog-user";
-const mqttUsername = "emqx_test";
-const mqttPassword = "emqx_test";
+const mqttUsername = process.env.REACT_APP_MQTT_USER;
+const mqttPassword = process.env.REACT_APP_MQTT_PASSWORD;
 const mqttTimeout = 400000;
-const mqttHost = "localhost";
-const mqttPort = "8083";
+const mqttHost = process.env.REACT_APP_MQTT_HOST;
+const mqttPort = process.env. REACT_APP_MQTT_PORT;
 const mqttConnectionOptions = {
   clean: true,
   connectTimeout: mqttTimeout,
@@ -14,15 +14,12 @@ const mqttConnectionOptions = {
   password: mqttPassword,
 };
 const mqttConnectionUrl = `ws://${mqttHost}:${mqttPort}/mqtt`;
-const mqttTopicPillsStatus = "pills/status";
 
 // Setup MQTT Connection
 const mqtt = require('mqtt-browser');
 
 class MQTT {
-  constructor() {
-
-  }
+  constructor() {}
 
   connect() {
     this.client = mqtt.connect(mqttConnectionUrl, mqttConnectionOptions);

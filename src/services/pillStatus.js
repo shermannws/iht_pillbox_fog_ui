@@ -1,5 +1,5 @@
 
-const url = 'http://localhost:3002'
+const url = process.env.REACT_APP_BACKEND_URL;
 
 export function getPillEntries(patientId) {
   return fetch(url + `/pillStatuses/patient/${patientId}`)
