@@ -21,6 +21,7 @@ const Chart = (props) => {
               new Date(e.administeredtime).getTime(),
               new Date(e.consumedtime).getTime()
             ],
+            fillColor: '#5570be'
           })
         } else {
           after_data.push({
@@ -29,15 +30,18 @@ const Chart = (props) => {
               new Date(e.administeredtime).getTime(),
               new Date(e.consumedtime).getTime()
             ],
+            fillColor: '#bea355'
           })
         }
       });
       setSeries([{
         name: "before-meal",
-        data: before_data
+        data: before_data,
+        fillColor: '#5570be'
       }, {
         name: "after-meal",
-        data: after_data
+        data: after_data,
+        fillColor: '#bea355'
       }])
     });
   }, [])
@@ -55,9 +59,15 @@ const Chart = (props) => {
     xaxis: {
       type: 'datetime'
     },
-    style: {
-      colors: ['#FEB019', '#fff']
-    }
+    legend: {
+      markers :{
+        fillColors: ['#5570be', '#bea355']
+      },
+      position: 'top'
+    },
+    title: {
+      text: `Chart History for Patient ${patientId}`
+    },
   });
 
   return (
