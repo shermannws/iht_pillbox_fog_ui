@@ -1,18 +1,17 @@
-import {useState, useEffect, useRef} from "react";
+import {useState, useEffect} from "react";
 import './OverviewPage.css';
 import MQTT from '../messenger/main'
 import PillNil from '../resources/pill_statuses/nil.svg';
 import PillYes from '../resources/pill_statuses/yes.svg';
 import PillNo from '../resources/pill_statuses/no.svg';
+import PillNoWarning from '../resources/pill_statuses/no-warning.svg';
 import PillsSelect from '../components/PillsSelect'
 import PillsListConfigure from "../components/PillsListConfigure";
-import {getLatestMedicationNumber, getPillEntries, createPillEntry, updatePillEntry} from "../services/pillStatus";
+import {getLatestMedicationNumber, createPillEntry, updatePillEntry} from "../services/pillStatus";
 import {getAllActivePills, getPrescription} from "../services/pillList";
 import AlarmIcon from '@mui/icons-material/Alarm';
-import WarningIcon from '@mui/icons-material/Warning';
 import { getPrediction } from "../services/prediction";
 
-const mqttTopicPillsStatus = "pills/status";
 const mqtt = new MQTT();
 mqtt.connect();
 mqtt.subscribe("pills/status");
@@ -45,7 +44,7 @@ function OverviewPage() {
           // Call getPrediction asynchronously
           const res = await getPrediction("before", beforeTime.toISOString());
           const time = res["predicted_time_difference"];
-          if (time[0] == "-") {
+          if (time[0] === "-") {
             return
           }
   
@@ -79,8 +78,11 @@ function OverviewPage() {
       if (afterState === 1) {
         try {
           // Call getPrediction asynchronously
-          const res = await getPrediction("after", beforeTime.toLocaleString());
+          const res = await getPrediction("after", beforeTime.toISOString());
           const time = res["predicted_time_difference"];
+          if (time[0] === "-") {
+            return
+          }
   
           // Calculate timer based on the prediction result
           const hours = Number(time.split(":")[0]);
@@ -117,10 +119,10 @@ function OverviewPage() {
       getPrescription(defaultPatientId).then((res) => {
         const before = {}
         const after = {}
-        for (const e in res) {
-          if (e.medication_type == 'before') {
+        for (const e of res) {
+          if (e["medication_type"] === 'before') {
             before[e.name] = e.assigned
-          } else if (e.medication_type == 'after') {
+          } else if (e["medication_type"] === 'after') {
             after[e.name] = e.assigned
           }
         }
@@ -178,7 +180,7 @@ function OverviewPage() {
   };
 
   const handleNewPill = (patientId, type, weight) => {
-    while (patientId == undefined && medicationId == undefined) {
+    while (patientId === undefined && medicationId === undefined) {
       continue
     }
     if (type === "before") {
@@ -290,10 +292,10 @@ function OverviewPage() {
 
   const alertPatient = (patientId, type) => {
     console.log("sending alert")
-    if (type=="before" && beforeState !== 1) {
+    if (type==="before" && beforeState !== 1) {
       return
     }
-    if (type=="after" && afterState !== 1) {
+    if (type==="after" && afterState !== 1) {
       return
     }
     mqtt.publish("reminder/led", JSON.stringify({patientId, type}))
@@ -363,24 +365,14 @@ function OverviewPage() {
           <div className="sub-grid">
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
-              <img src={stateToPillMap[beforeState]} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {beforeWarning ? <WarningIcon  /> : <></>}
-                </div>
+              <img src={beforeState===1 && beforeWarning ? PillNoWarning : stateToPillMap[beforeState]} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
                 <button className="alarm-btn" onClick={()=>alertPatient(1,"before")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> {beforeTime?beforeTime.toLocaleTimeString():"-"}</p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
-              <img src={stateToPillMap[afterState]} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {afterWarning ? <WarningIcon  /> : <></>}
-                </div>
+              <img src={afterState===1 && afterWarning ? PillNoWarning : stateToPillMap[afterState]} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
                 <button className="alarm-btn" onClick={()=>alertPatient(1,"after")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> {afterTime?afterTime.toLocaleTimeString():"-"}</p>
             </div>
           </div>
@@ -393,23 +385,13 @@ function OverviewPage() {
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {false ? <WarningIcon  /> : <></>}
-                </div>
                 <button className="alarm-btn" onClick={()=>alertPatient(2,"before")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> 11:00:00 AM</p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
               <img src={PillNo} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {false ? <WarningIcon  /> : <></>}
-                </div>
                 <button className="alarm-btn" onClick={()=>alertPatient(2,"after")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> 10:55:00 AM</p>
             </div>
           </div>
@@ -422,23 +404,13 @@ function OverviewPage() {
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {false ? <WarningIcon  /> : <></>}
-                </div>
                 <button className="alarm-btn" onClick={()=>alertPatient(3,"before")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> 12:00:00 PM</p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {false ? <WarningIcon  /> : <></>}
-                </div>
                 <button className="alarm-btn" onClick={()=>alertPatient(3,"after")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> 12:58:00 PM</p>
             </div>
           </div>
@@ -451,23 +423,13 @@ function OverviewPage() {
             <div className="pill-info-box">
               <p className="pill-title">Before Meal Pill(s)</p>
               <img src={PillNil} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {false ? <WarningIcon  /> : <></>}
-                </div>
                 <button className="alarm-btn" onClick={()=>alertPatient(4,"before")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> - </p>
             </div>
             <div>
               <p className="pill-title">After Meal Pill(s)</p>
               <img src={PillYes} alt="Pill Status" style={{ width: '150px', height: 'auto' }} />
-              <div className="pill-panel">
-                <div className="warning-icon">
-                  {false ? <WarningIcon  /> : <></>}
-                </div>
                 <button className="alarm-btn" onClick={()=>alertPatient(4,"after")}><AlarmIcon/></button>
-              </div>
               <p className="pill-status-text">Last Updated: <br/> 13:11:00 PM</p>
             </div>
           </div>

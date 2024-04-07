@@ -13,7 +13,9 @@ import ListItemText from '@mui/material/ListItemText';
 import IconButton from '@mui/material/IconButton';
 import Grid from '@mui/material/Grid';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { addNewPill, deletePillFromList } from "../services/pillList"
+import { addNewPill, deletePillFromList } from "../services/pillList";
+
+import './PillsListConfigure.css';
 
 const Demo = styled('div')(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -52,12 +54,12 @@ export default function PillsListConfigure(props) {
   }
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <FormControl sx={{ m: 3 }} component="fieldset" variant="standard">
+    <Box className="pill-list-box" sx={{ display: 'flex' }}>
+      <FormControl className="pill-list-box" sx={{ m: 6 }} component="fieldset" variant="standard">
         <FormLabel component="legend">Add new pills into the list</FormLabel>
         <FormGroup>
           
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={12}>
           <Demo>
             <List dense={false}>
               {Object.keys(state).map((k) => {
@@ -71,7 +73,7 @@ export default function PillsListConfigure(props) {
                   >
                   <ListItemText
                     primary={k}
-                    secondary={state[k] + " mg"}
+                    secondary={state[k] + " weight unit"}
                   />
                 </ListItem>
                 );
@@ -84,7 +86,7 @@ export default function PillsListConfigure(props) {
           <TextField
             value={newPillName}
             onInput={ e=>setNewPillName(e.target.value)}
-            label="Name of New Pill"
+            label="Name of New Pill (Strength of Pill)"
             variant="outlined"
             fullWidth
             margin="normal"
@@ -92,7 +94,7 @@ export default function PillsListConfigure(props) {
           <TextField
             value={newPillWeight}
             onInput={ e=>setNewPillWeight(e.target.value)}
-            label="Mass of New Pill (mg)"
+            label="Mass of New Pill (weight unit)"
             type="number"
           />
           <Button type="submit" onClick={handleSubmit}>Add Pill</Button>
